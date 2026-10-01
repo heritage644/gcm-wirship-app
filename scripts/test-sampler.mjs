@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Tests the recorded-WAV sampler using a fake Web Audio graph and WAV loader. */
+/** Tests the public-sample Web Audio player using a fake graph and buffer loader. */
 
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
@@ -22,7 +22,7 @@ registerHooks({
   },
 });
 
-const [{ SampleSamplerEngine, noteToMidi }, { DEFAULT_SAMPLE_LAYERS, PAD_PRESETS }] = await Promise.all([
+const [{ SampleSamplerEngine, noteToMidi }, { DEFAULT_SAMPLE_LAYERS, getPadSampleUrls, PAD_PRESETS }] = await Promise.all([
   import(pathToFileURL(resolve(SRC, 'audio/SampleSamplerEngine.ts')).href),
   import(pathToFileURL(resolve(SRC, 'config/padPresets.ts')).href),
 ]);
@@ -104,11 +104,26 @@ async function test(name, run) {
   }
 }
 
-console.log('\nRecorded WAV sampler\n');
+console.log('\nPublic sample sampler\n');
 
-await test('catalog defines the requested pads and recommended C2/C4/C6 roots', () => {
+await test('catalog defines the requested pads and public C2/C4/C6 sample URLs', () => {
   assert.deepEqual(Object.keys(PAD_PRESETS), ['warm-pad', 'shimmer-pad', 'sub-bass']);
   assert.deepEqual(PAD_PRESETS['warm-pad'].expectedAnchors, ['C2', 'C4', 'C6']);
+  assert.deepEqual(getPadSampleUrls('warm-pad'), {
+    C2: 'https://tonejs.github.io/audio/salamander/C2.mp3',
+    C4: 'https://tonejs.github.io/audio/salamander/C4.mp3',
+    C6: 'https://tonejs.github.io/audio/salamander/C6.mp3',
+  });
+  assert.deepEqual(getPadSampleUrls('shimmer-pad'), {
+    C2: 'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/pad_2_warm-mp3/C2.mp3',
+    C4: 'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/pad_2_warm-mp3/C4.mp3',
+    C6: 'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/pad_2_warm-mp3/C6.mp3',
+  });
+  assert.deepEqual(getPadSampleUrls('sub-bass'), {
+    C2: 'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/synth_bass_1-mp3/C2.mp3',
+    C4: 'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/synth_bass_1-mp3/C4.mp3',
+    C6: 'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/synth_bass_1-mp3/C6.mp3',
+  });
   assert.equal(DEFAULT_SAMPLE_LAYERS.length, 3);
   assert.equal(noteToMidi('C2'), 36);
   assert.equal(noteToMidi('C4'), 60);
@@ -131,13 +146,14 @@ await test('missing roots are reported and available roots remain usable', async
   assert.deepEqual(reports[0].loaded, ['C2', 'C4']);
   assert.deepEqual(reports[0].missing, ['C6']);
   await engine.playKey('G');
+  assert.equal(context.state, 'running', 'the first key play resumes a suspended AudioContext');
   assert.equal(context.sources.length, 1);
   assert.ok(Math.abs(context.sources[0].playbackRate.value - 2 ** (7 / 12)) < 1e-8);
   engine.dispose();
   assert.equal(context.state, 'running', 'an injected AudioContext remains host-owned');
 });
 
-await test('simultaneous pad and ambience layers use only supplied WAV buffers', async () => {
+await test('simultaneous pad and ambience layers use only supplied sample buffers', async () => {
   const context = new FakeAudioContext();
   const engine = new SampleSamplerEngine({
     context,
@@ -210,7 +226,7 @@ await test('preset/layer changes crossfade new sources and retire old voices', a
   await sleep(1);
 });
 
-await test('no WAVs produces a clear error instead of synthesized fallback audio', async () => {
+await test('unavailable samples produce a clear error instead of synthesized fallback audio', async () => {
   const context = new FakeAudioContext();
   const engine = new SampleSamplerEngine({
     context,
@@ -218,7 +234,7 @@ await test('no WAVs produces a clear error instead of synthesized fallback audio
     loadBuffer: fakeLoader,
   });
   await engine.setLayers([{ id: 'warm', sourceId: 'warm-pad', enabled: true, volume: 1 }]);
-  await assert.rejects(engine.playKey('C'), /No recorded WAV samples are ready/);
+  await assert.rejects(engine.playKey('C'), /No samples could be loaded/);
   assert.equal(context.sources.length, 0);
   engine.dispose();
 });

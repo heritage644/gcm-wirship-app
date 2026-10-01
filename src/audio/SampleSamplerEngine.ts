@@ -1,9 +1,10 @@
 /**
  * AudioBuffer-based multisample pad engine for web.
  *
- * The engine never creates or synthesizes audio. It loads recorded WAV files,
- * maps each note to the nearest recorded root, and uses playbackRate to transpose
- * that sample. Every enabled layer gets its own voice and level control.
+ * The engine never creates or synthesizes audio. It fetches public instrument
+ * samples (plus optional local ambience loops), maps each note to the nearest
+ * recorded root, and uses playbackRate to transpose it. Every enabled layer has
+ * its own voice and level control.
  */
 
 import {
@@ -215,7 +216,7 @@ export class SampleSamplerEngine {
     return reports;
   }
 
-  /** Unlock audio and warm all enabled WAVs for the progression scheduler. */
+  /** Resume browser audio and warm enabled samples for the progression scheduler. */
   async prepare(): Promise<void> {
     this.assertAlive();
     await this.initialize();
@@ -409,7 +410,7 @@ export class SampleSamplerEngine {
 
       for (const result of results) {
         if (result.error) {
-          errors.push(`${result.note}.wav: ${result.error}`);
+          errors.push(`${result.note}: ${result.error}`);
           missing.push(result.note);
         } else {
           loaded.push(result.note);
@@ -451,7 +452,7 @@ export class SampleSamplerEngine {
     if (existingLoad) return existingLoad;
 
     const loader = this.options.loadBuffer;
-    if (!loader) throw new Error('No WAV sample loader was configured.');
+    if (!loader) throw new Error('No sample audio loader was configured.');
     const pending = loader(module, context)
       .then((buffer) => {
         this.buffers.set(key, buffer);
@@ -612,7 +613,7 @@ export class SampleSamplerEngine {
   private assertPlayable(reports: readonly SampleLoadReport[]): void {
     const hasPlayableLayer = reports.some((report) => report.loaded.length > 0);
     if (!hasPlayableLayer) {
-      throw new Error('No recorded WAV samples are ready. Add WAV files to the sample folders shown below.');
+      throw new Error('No samples could be loaded. Check your internet connection and the configured sample URLs.');
     }
   }
 

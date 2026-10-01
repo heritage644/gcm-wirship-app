@@ -1,11 +1,11 @@
-/** Web performance screen for recorded-WAV pad layers and progression playback. */
+/** Web performance screen for public-sample pad layers and progression playback. */
 
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { SampleSamplerEngine, type SampleLoadReport } from '../audio/SampleSamplerEngine';
 import { SequencerEngine } from '../audio/SequencerEngine';
-import { loadMetroSampleBuffer, metroSampleAssets } from '../audio/metroSampleAudio';
+import { loadSampleBuffer, sampleAssets } from '../audio/metroSampleAudio';
 import { Panel, SectionLabel } from '../components/ui/Primitives';
 import {
   DEFAULT_SAMPLE_LAYERS,
@@ -39,17 +39,15 @@ function reportLabel(
   report: SampleLoadReport | undefined,
   loading: boolean,
 ): string {
-  if (loading) return 'LOADING WAV SAMPLES…';
+  if (loading) return 'LOADING SAMPLES…';
   if (!report) return 'NOT LOADED';
   if (report.status === 'ready') return `${report.loaded.length} SAMPLE${report.loaded.length === 1 ? '' : 'S'} READY`;
   if (report.status === 'partial') {
-    const decodeErrors = report.errors.length > 0 ? ` · ${report.errors.join(' · ')}` : '';
-    return `PARTIAL · ${report.loaded.length} READY · MISSING ${report.missing.join(', ')}${decodeErrors}`;
+    const errors = report.errors.length > 0 ? ` · ${report.errors.join(' · ')}` : '';
+    return `PARTIAL · ${report.loaded.length} READY · MISSING ${report.missing.join(', ')}${errors}`;
   }
-  if (report.status === 'error') return `DECODE ERROR · ${report.errors.join(' · ')}`;
-  return isPadSource(sourceId)
-    ? `MISSING · ADD ${PAD_PRESETS[sourceId].expectedAnchors.map((anchor) => `${anchor}.WAV`).join(', ')}`
-    : 'MISSING · ADD LOOP.WAV';
+  if (report.status === 'error') return `SAMPLE LOAD ERROR · ${report.errors.join(' · ')}`;
+  return isPadSource(sourceId) ? 'PUBLIC SAMPLES UNAVAILABLE' : 'MISSING · ADD LOOP.WAV';
 }
 
 function isPadSource(sourceId: SampleSourceId): sourceId is keyof typeof PAD_PRESETS {
@@ -58,7 +56,7 @@ function isPadSource(sourceId: SampleSourceId): sourceId is keyof typeof PAD_PRE
 
 export function SamplerScreen() {
   const audio = useMemo(
-    () => new SampleSamplerEngine({ assets: metroSampleAssets, loadBuffer: loadMetroSampleBuffer }),
+    () => new SampleSamplerEngine({ assets: sampleAssets, loadBuffer: loadSampleBuffer }),
     [],
   );
   const sequencer = useMemo(() => new SequencerEngine(audio), [audio]);
@@ -225,7 +223,7 @@ export function SamplerScreen() {
         return;
       }
       await sequencer.play({
-        id: 'recorded-sample-progression',
+        id: 'public-sample-progression',
         songTitle: 'Sample Layer Progression',
         bpm,
         timeSignature,
@@ -253,7 +251,7 @@ export function SamplerScreen() {
     return (
       <View style={styles.unsupported}>
         <Text style={styles.title}>WEB AUDIO NOT AVAILABLE</Text>
-        <Text style={styles.body}>Open AuraPad in a modern browser to audition recorded WAV samples.</Text>
+        <Text style={styles.body}>Open AuraPad in a modern browser to stream the public instrument samples.</Text>
       </View>
     );
   }
@@ -266,27 +264,25 @@ export function SamplerScreen() {
     >
       <View style={styles.hero}>
         <View style={styles.heroCopy}>
-          <Text style={styles.eyebrow}>AURAPAD · RECORDED WAV SAMPLER</Text>
+          <Text style={styles.eyebrow}>AURAPAD · PUBLIC SAMPLE BANK</Text>
           <Text style={styles.title}>BUILD YOUR PAD LAYERS</Text>
           <Text style={styles.body}>
-            Layer recorded Warm Pad, Shimmer Pad, Sub Drone, and ambience samples. Choose an octave,
-            audition a key, and sequence a progression.
+            Layer streamed Warm Pad, Shimmer Pad, Sub Drone, and optional ambience samples. Choose an
+            octave, audition a key, and sequence a progression.
           </Text>
         </View>
         <View style={[styles.statusBadge, sounding && styles.statusBadgeActive]}>
           <View style={[styles.statusDot, sounding && styles.statusDotActive]} />
           <Text style={[styles.statusText, sounding && styles.statusTextActive]}>
-            {sounding ? `SOUNDING · ${displayKey}${octave}` : loadedSourceCount > 0 ? 'SAMPLES READY' : 'AWAITING WAV FILES'}
+            {sounding
+              ? `SOUNDING · ${displayKey}${octave}`
+              : loading
+                ? 'LOADING SAMPLES'
+                : loadedSourceCount > 0
+                  ? 'SAMPLES READY'
+                  : 'NO SAMPLES AVAILABLE'}
           </Text>
         </View>
-      </View>
-
-      <View style={styles.noticeBox}>
-        <Text style={styles.noticeTitle}>RECORDED SAMPLES ONLY</Text>
-        <Text style={styles.noticeText}>
-          No recorded pad WAVs are bundled yet. Add royalty-cleared files to the folders shown in each
-          layer status below; missing anchors are reported here rather than synthesized.
-        </Text>
       </View>
 
       {error ? (
@@ -329,9 +325,7 @@ export function SamplerScreen() {
                     <Text style={styles.layerIndex}>LAYER {String(index + 1).padStart(2, '0')}</Text>
                     <Text style={styles.layerName}>{source.name}</Text>
                     <Text style={styles.layerDescription}>{source.description}</Text>
-                    <Text style={styles.sampleFolder}>
-                      src/assets/audio/{source.kind === 'pad' ? 'pads' : 'beds'}/{source.id}/
-                    </Text>
+                    <Text style={styles.sampleFolder}>{source.location}</Text>
                   </View>
                   <Pressable
                     onPress={() => updateLayer(layer.id, { enabled: !layer.enabled })}
@@ -505,7 +499,7 @@ export function SamplerScreen() {
             </Text>
             <Text style={styles.readoutSub}>
               {sequenceState.status === 'stopped'
-                ? 'Starts after enabled WAV layers are loaded.'
+                ? 'Starts after enabled samples are loaded.'
                 : `${sequenceState.currentKey ?? '—'} → ${sequenceState.nextKey ?? 'END'} · ${sequenceState.beatsRemainingInStep.toFixed(1)} beats remaining`}
             </Text>
             {sequenceState.status !== 'stopped' ? (
@@ -593,8 +587,8 @@ export function SamplerScreen() {
       </Panel>
 
       <Text style={styles.disclaimer}>
-        Pitch is shifted from the nearest recorded WAV root. Add clean, loop-ready files; no
-        procedural oscillator or generated sample fallback is used.
+        Pad samples stream from their public sources and require an internet connection. Pitch is
+        shifted from the nearest mapped root; optional ambience beds remain local assets.
       </Text>
     </ScrollView>
   );
@@ -614,9 +608,6 @@ const styles = StyleSheet.create({
   statusDotActive: { backgroundColor: colors.success },
   statusText: { ...typography.labelSmall, color: colors.textSecondary },
   statusTextActive: { color: colors.success },
-  noticeBox: { padding: spacing.md, gap: spacing.xs, borderWidth: 1, borderColor: colors.warning, borderRadius: radius.md, backgroundColor: 'rgba(255, 183, 77, 0.07)' },
-  noticeTitle: { ...typography.labelSmall, color: colors.warning },
-  noticeText: { ...typography.body, color: colors.textSecondary, lineHeight: 20 },
   errorBox: { padding: spacing.md, borderWidth: 1, borderColor: colors.danger, borderRadius: radius.md, backgroundColor: 'rgba(255, 77, 109, 0.08)' },
   errorText: { ...typography.body, color: colors.danger },
   addActions: { flexDirection: 'row', gap: spacing.xs },

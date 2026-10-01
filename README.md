@@ -3,8 +3,8 @@
 A multi-stem ambient pad and worship engine for live performance, built with Expo / React Native.
 
 On iOS/Android, four legacy stems play in sync across the twelve musical keys with logarithmic
-crossfades. In the browser, the Perform screen uses the recorded-WAV multisample rack described
-below; those samples must be supplied in the documented folders.
+crossfades. In the browser, Perform streams multisamples from public audio hosts; an internet
+connection is required. Optional ambience beds can still be supplied locally.
 
 ---
 
@@ -15,9 +15,9 @@ npm install
 npm start                # then press i / a / w, or scan the QR code
 ```
 
-The browser Perform screen uses recorded WAV multisamples. No new synthetic audio is generated;
-place your licensed recordings in the sample directories described below. The old key-loop assets
-remain only for the native Expo Audio compatibility path.
+The browser Perform screen downloads real instrument multisamples from public hosts at runtime;
+no local pad recordings are required. The old key-loop assets remain only for the native Expo Audio
+compatibility path, and optional ambience loops can be added under `src/assets/audio/beds/`.
 
 | Target | Command |
 | --- | --- |
@@ -37,7 +37,7 @@ npm run check          # typecheck + lint + the full test suite
 npm run typecheck      # tsc --noEmit
 npm run lint           # eslint
 npm test               # fade math + audio engines + sequencer + legacy loop integrity
-npm run verify:audio   # prove every generated loop is click-free
+npm run verify:audio   # verify the pre-existing native compatibility loops
 ```
 
 ---
@@ -124,33 +124,30 @@ progress bar during the fade, and the screen is kept awake while the tab is open
 
 ---
 
-## Recorded WAV sample bank (Web Audio)
+## Public sample bank (Web Audio)
 
-The browser's **PERFORM** tab is a real WAV multisampler. It does not create oscillator tones,
-render audio with JavaScript, or fall back to generated samples. Each enabled layer loads recordings
-from its own folder, then transposes the nearest recorded root with Web Audio `playbackRate`.
-Missing roots and decode errors appear in the layer rack; absent files are never synthesized.
+The browser **PERFORM** tab fetches and decodes instrument MP3 samples directly from public hosts.
+The Web Audio sampler maps each played key to the nearest listed root and transposes that buffer;
+there is no oscillator or synthetic fallback. No local pad WAVs are required. The browser must be
+online and the remote hosts must allow cross-origin audio requests.
 
-### Add pad multisamples
+| Layer | Base URL | Mapped roots |
+| --- | --- | --- |
+| Warm Pad | [`tonejs.github.io/audio/salamander/`](https://tonejs.github.io/audio/salamander/) | `C2.mp3`, `C4.mp3`, `C6.mp3` |
+| Shimmer Pad | [`FluidR3_GM/pad_2_warm-mp3/`](https://github.com/gleitz/midi-js-soundfonts/tree/gh-pages/FluidR3_GM/pad_2_warm-mp3) | `C2.mp3`, `C4.mp3`, `C6.mp3` |
+| Sub Drone | [`FluidR3_GM/synth_bass_1-mp3/`](https://github.com/gleitz/midi-js-soundfonts/tree/gh-pages/FluidR3_GM/synth_bass_1-mp3) | `C2.mp3`, `C4.mp3`, `C6.mp3` |
 
-Put royalty-cleared, sustained/loop-ready WAV files here:
+The FluidR3 GM library names its warm pad program `pad_2_warm-mp3`; the similarly named
+`synth_pad_1_warm-mp3` directory from an earlier proposed URL is not present there, so AuraPad uses
+the actual GM `Pad 2 Warm` folder. Samples load when their layer is enabled. Fetch and decode
+failures are shown on that layer; one unavailable source does not block other playable layers.
+The first note button and the progression play button resume the browser `AudioContext` from the
+user gesture, as required by autoplay policies.
 
-```text
-src/assets/audio/pads/
-├── warm-pad/       C2.wav  C4.wav  C6.wav
-├── shimmer-pad/    C2.wav  C4.wav  C6.wav
-└── sub-bass/       C2.wav  C4.wav  C6.wav
-```
+### Optional ambience beds
 
-The recommended anchors are C2, C4, and C6. Additional note-named roots are supported, for example
-`G3.wav` or `F#5.wav`; the sampler picks the closest available root for the played note. Use the
-same filename convention in each pad directory. The files should be clean sustained recordings
-whose loop points have already been prepared—AuraPad loops them but does not edit, synthesize, or
-repair the audio.
-
-### Add ambience beds
-
-Ambience is unpitched and uses one pre-looped recording per bed:
+The ambience sources remain optional local loops. Place a loop at the matching path if you want to
+use one; a missing ambience file does not prevent pad playback:
 
 ```text
 src/assets/audio/beds/
@@ -159,17 +156,8 @@ src/assets/audio/beds/
 └── vinyl-bed/loop.wav
 ```
 
-### Load the recordings
-
-Metro's WAV asset contexts discover files in these folders. After adding recordings, restart Expo if
-the new files are not picked up, then run `npm run web`; a production browser bundle must be
-exported again to include the samples. The app contains folder README files but **no pad or ambience
-recordings have been supplied yet**, so the sample rack initially reports missing WAVs and playback
-stays silent until real files are added.
-
-Downloaded soundfont packs are not loaded directly. Extract or record the desired note samples as
-WAV files, make sure you have the right to use them, and place them with the names above. Keep
-license and attribution information beside the files when required.
+These loops should be prepared as seamless WAVs. Remote samples and soundfont-derived assets have
+separate licenses and attribution terms; review those terms before distributing the app.
 
 ### Legacy native audio
 
@@ -184,11 +172,10 @@ renderer has been removed; no script in the app creates replacement audio. The o
 ```
 src/
 ├── assets/audio/
-│   ├── pads/<pad-id>/   # recorded multisamples for the browser sampler
-│   ├── beds/<bed-id>/   # recorded ambience loops
+│   ├── beds/<bed-id>/   # optional local ambience loops
 │   └── pads/<key>/      # legacy native loop assets
 ├── audio/
-│   ├── SampleSamplerEngine.ts  # Web Audio WAV sampler and layer crossfades
+│   ├── SampleSamplerEngine.ts  # Web Audio sample player and layer crossfades
 │   └── SequencerEngine.ts      # audio-clock progression scheduler
 ├── components/
 │   ├── AudioControls/   # native mixer controls
@@ -207,7 +194,7 @@ scripts/                 # verification and test suites; no audio generator
 Two deliberate departures from a stock Expo app:
 
 - **No navigation library.** Native tabs share the existing live audio engine; on web, Perform
-  owns the browser WAV sampler. Screens stay mounted and visibility is toggled, preserving state
+  owns the browser sample rack. Screens stay mounted and visibility is toggled, preserving state
   while switching tabs. Stage Mode also needs to remove the tab bar entirely.
 
 - **No slider library.** `Fader` is built on Reanimated so it animates on the UI thread, can be a
@@ -228,7 +215,7 @@ figures so they do not shuffle sideways as they tick.
 | `scripts/test-fades.mjs` | 18 tests. Curve endpoints, monotonicity, symmetry, dB linearity, equal-power constancy, X/Y mapping, gain graph clamping. |
 | `scripts/test-engine.mjs` | Runs the **real** native `AudioService`, stubbing only `expo-audio` and the Metro asset registry. Covers crossfades, drone lock, cache eviction, mixer gain, and preload behavior. |
 | `scripts/test-sequencer.mjs` | Audio-clock progression scheduling, pause/resume, looping, tempo changes, time signatures, and invalid step handling. |
-| `scripts/test-sampler.mjs` | WAV anchor lookup, pitch transposition, simultaneous layers, missing-file errors, crossfades, and disposal. |
+| `scripts/test-sampler.mjs` | Public sample URL mapping, pitch transposition, simultaneous layers, fetch errors, crossfades, and disposal. |
 | `scripts/verify-audio.mjs` | Checks the 39 pre-existing native compatibility loops; it does not generate audio or validate newly added multisamples. |
 
 No jest, no transform step: `fades.ts` has no React Native imports, and Node strips the

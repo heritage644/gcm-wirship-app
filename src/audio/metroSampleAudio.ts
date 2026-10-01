@@ -1,6 +1,7 @@
 import { Asset } from 'expo-asset';
 
-import { getAmbientBedModule, getPadSampleModules } from '../assets/audio/sampleRegistry';
+import { getAmbientBedModule } from '../assets/audio/sampleRegistry';
+import { getPadSampleUrls } from '../config/padPresets';
 import type { AmbientBedId, PadPresetId } from '../config/padPresets';
 import type {
   SampleAssetModule,
@@ -8,13 +9,13 @@ import type {
   SampleBufferLoader,
 } from './SampleSamplerEngine';
 
-export const metroSampleAssets: SampleAssetResolver = {
-  getPadSamples: (presetId: PadPresetId) => getPadSampleModules(presetId),
+export const sampleAssets: SampleAssetResolver = {
+  getPadSamples: (presetId: PadPresetId) => getPadSampleUrls(presetId),
   getAmbientBed: (bedId: AmbientBedId) => getAmbientBedModule(bedId),
 };
 
-/** Resolve a Metro-bundled WAV to a URI, then decode the recorded bytes. */
-export const loadMetroSampleBuffer: SampleBufferLoader = async (
+/** Fetch either a public MP3 URL or an optional Metro WAV, then decode it. */
+export const loadSampleBuffer: SampleBufferLoader = async (
   module: SampleAssetModule,
   context: AudioContext,
 ) => {

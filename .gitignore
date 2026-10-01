@@ -41,4 +41,4 @@ yarn-error.*
 /android
 
 # AuraPad keeps the pre-existing native compatibility loops in source control.
-# New recorded WAV multisamples belong in src/assets/audio/pads/<pad-id>/.
+# Browser pad multisamples are fetched at runtime from public audio hosts.

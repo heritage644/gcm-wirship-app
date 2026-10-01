@@ -1,7 +1,7 @@
 /**
  * PerformScreen — the native live dashboard and browser sample-layer entry.
  * Native: transport → key grid → crossfade status → 4-channel mixer.
- * Web: recorded-WAV multisampler, layer rack, and progression sequencer.
+ * Web: public-source multisampler, layer rack, and progression sequencer.
  */
 
 import { useCallback } from 'react';
@@ -35,7 +35,7 @@ export function PerformScreen({ engine }: PerformScreenProps) {
     [engine, state.currentKey],
   );
 
-  // The browser uses the recorded-WAV sampler. Native builds retain the
+  // The browser uses the public-source sampler. Native builds retain the
   // existing Expo Audio multi-stem path, which is not backed by Web Audio.
   if (Platform.OS === 'web') return <SamplerScreen />;
 
