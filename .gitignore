@@ -39,3 +39,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# AuraPad: the generated sample library IS committed (the app needs it to run).
+# Re-render it with `npm run generate:audio`.
