@@ -1,8 +1,5 @@
 #!/usr/bin/env node
-/**
- * Node-level tests for the audio-clock progression scheduler and preset catalog.
- * The sequencer receives a fake audio clock; production code remains unchanged.
- */
+/** Node-level tests for the audio-clock progression scheduler. */
 
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
@@ -25,10 +22,7 @@ registerHooks({
   },
 });
 
-const [{ SequencerEngine }, { YamahaEngine, YAMAHA_PRESETS, YAMAHA_PRESET_LIST }] = await Promise.all([
-  import(pathToFileURL(resolve(SRC, 'audio/SequencerEngine.ts')).href),
-  import(pathToFileURL(resolve(SRC, 'audio/dsp/YamahaEngine.ts')).href),
-]);
+const { SequencerEngine } = await import(pathToFileURL(resolve(SRC, 'audio/SequencerEngine.ts')).href);
 
 class FakeAudioTarget {
   startedAt = performance.now();
@@ -43,18 +37,9 @@ class FakeAudioTarget {
   }
 
   async prepare() {}
-
-  setPreset(presetId) {
-    this.selectedPreset = presetId;
-  }
-
-  setBpm(bpm) {
-    this.bpm = bpm;
-  }
-
-  setFadeCurve(curve) {
-    this.fadeCurve = curve;
-  }
+  setPreset(presetId) { this.selectedPreset = presetId; }
+  setBpm(bpm) { this.bpm = bpm; }
+  setFadeCurve(curve) { this.fadeCurve = curve; }
 
   scheduleKeyChange(key, atTime, fadeSeconds) {
     const call = { key, atTime, fadeSeconds, cancelled: false };
@@ -75,86 +60,13 @@ const progression = {
   songTitle: 'Test Song',
   bpm: 120,
   timeSignature: '4/4',
-  soundPresetId: 'anadayz-pad',
+  soundPresetId: 'sample-layer-rack',
   steps: [
     { id: 'one', targetKey: 'C', durationInBeats: 1, crossfadeDurationSeconds: 0.1 },
     { id: 'four', targetKey: 'F', durationInBeats: 1, crossfadeDurationSeconds: 0.2 },
     { id: 'five', targetKey: 'G', durationInBeats: 1, crossfadeDurationSeconds: 0.3 },
   ],
 };
-
-class FakeAudioParam {
-  value = 0;
-
-  setValueAtTime(value) { this.value = value; }
-  setTargetAtTime(value) { this.value = value; }
-  linearRampToValueAtTime(value) { this.value = value; }
-  exponentialRampToValueAtTime(value) { this.value = value; }
-  setValueCurveAtTime(values) { this.value = values.at(-1); }
-  cancelScheduledValues() {}
-}
-
-class FakeAudioNode {
-  connections = [];
-  inputs = [];
-  connect(destination) {
-    this.connections.push(destination);
-    destination?.inputs?.push(this);
-    return destination;
-  }
-  disconnect() { this.connections = []; }
-}
-
-class FakeScheduledSource extends FakeAudioNode {
-  onended = null;
-  startTime = null;
-  stopTime = null;
-  start(when = 0) { this.startTime = when; }
-  stop(when = 0) { this.stopTime = when; }
-}
-
-class FakeAudioContext {
-  currentTime = 2;
-  sampleRate = 8_000;
-  state = 'running';
-  destination = new FakeAudioNode();
-
-  createGain() { const node = new FakeAudioNode(); node.gain = new FakeAudioParam(); return node; }
-  createDelay() { const node = new FakeAudioNode(); node.delayTime = new FakeAudioParam(); return node; }
-  createConvolver() { const node = new FakeAudioNode(); node.normalize = true; node.buffer = null; return node; }
-  createBiquadFilter() {
-    const node = new FakeAudioNode();
-    node.frequency = new FakeAudioParam();
-    node.Q = new FakeAudioParam();
-    node.type = 'lowpass';
-    return node;
-  }
-  createStereoPanner() { const node = new FakeAudioNode(); node.pan = new FakeAudioParam(); return node; }
-  createOscillator() {
-    const node = new FakeScheduledSource();
-    node.frequency = new FakeAudioParam();
-    node.detune = new FakeAudioParam();
-    node.type = 'sine';
-    return node;
-  }
-  createBufferSource() {
-    const node = new FakeScheduledSource();
-    node.detune = new FakeAudioParam();
-    node.playbackRate = new FakeAudioParam();
-    node.loop = false;
-    node.buffer = null;
-    return node;
-  }
-  createBuffer(channels, length) {
-    const channelData = Array.from({ length: channels }, () => new Float32Array(length));
-    return {
-      numberOfChannels: channels,
-      getChannelData: (channel) => channelData[channel],
-    };
-  }
-  async resume() { this.state = 'running'; }
-  async close() { this.state = 'closed'; }
-}
 
 let passed = 0;
 let failed = 0;
@@ -171,35 +83,8 @@ async function test(name, run) {
   }
 }
 
-console.log('\nYamaha profiles\n');
-await test('catalog contains all 14 requested, categorized patch profiles', () => {
-  assert.equal(YAMAHA_PRESET_LIST.length, 14);
-  assert.equal(Object.keys(YAMAHA_PRESETS).length, 14);
-  assert.equal(YAMAHA_PRESETS['wax-and-wane'].lfo.syncEveryBeats, 8);
-  assert.equal(YAMAHA_PRESETS['motion-pad'].lfo.syncEveryBeats, 2);
-  assert.equal(YAMAHA_PRESETS['analog-pad'].filter.stages, 2);
-  assert.equal(YAMAHA_PRESETS['solo-viola-af1'].filter.type, 'bandpass');
-});
-
-await test('Web Audio engine initializes and builds every preset without browser globals', async () => {
-  const context = new FakeAudioContext();
-  const engine = new YamahaEngine({ context, initialBpm: 92 });
-  await engine.initialize();
-  await engine.playKey('C', { fadeSeconds: 0.05 });
-
-  for (const preset of YAMAHA_PRESET_LIST) engine.setPreset(preset.id, 0.05);
-  engine.setBpm(110);
-  engine.setXY({ x: 0.8, y: 0.65 });
-  assert.equal(engine.presetId, YAMAHA_PRESET_LIST.at(-1).id);
-  assert.equal(engine.activeKey, 'C');
-  assert.ok(context.destination.inputs.length > 0);
-
-  engine.stop(0.05);
-  engine.dispose();
-  assert.equal(context.state, 'running', 'an injected context remains host-owned');
-});
-
 console.log('\nSequencer clock\n');
+
 await test('schedules steps and beat clicks against the audio clock', async () => {
   const audio = new FakeAudioTarget();
   const engine = new SequencerEngine(audio, { tickIntervalMs: 10, lookAheadSeconds: 0.16 });
@@ -221,7 +106,6 @@ await test('schedules steps and beat clicks against the audio clock', async () =
   );
   assert.equal(engine.getSnapshot().currentStepIndex, 1);
   assert.equal(engine.getSnapshot().currentKey, 'F');
-
   engine.dispose();
 });
 
@@ -233,7 +117,7 @@ await test('pause cancels future events and resume keeps the current key step', 
   engine.pause();
 
   const queuedG = audio.keyChanges.find((change) => change.key === 'G');
-  assert.ok(queuedG, 'third step should have entered the lookahead window');
+  assert.ok(queuedG, 'third step should have entered the lookahead queue');
   assert.equal(queuedG.cancelled, true, 'pause should cancel a not-yet-started step');
   assert.equal(engine.getSnapshot().status, 'paused');
   assert.equal(engine.getSnapshot().currentKey, 'F');

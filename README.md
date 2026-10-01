@@ -2,8 +2,9 @@
 
 A multi-stem ambient pad and worship engine for live performance, built with Expo / React Native.
 
-Four stems play in sync for any of the twelve musical keys. Changing key runs a logarithmic
-crossfade between the outgoing and incoming loops, so the sound never stops and never clicks.
+On iOS/Android, four legacy stems play in sync across the twelve musical keys with logarithmic
+crossfades. In the browser, the Perform screen uses the recorded-WAV multisample rack described
+below; those samples must be supplied in the documented folders.
 
 ---
 
@@ -11,12 +12,12 @@ crossfade between the outgoing and incoming loops, so the sound never stops and 
 
 ```bash
 npm install
-npm run generate:audio   # renders the 39-file sample library (~8 MB, ~12s)
 npm start                # then press i / a / w, or scan the QR code
 ```
 
-The audio library is committed, so `generate:audio` is only needed if you want to re-render it
-or change the synthesis. Everything else runs straight from a clean clone.
+The browser Perform screen uses recorded WAV multisamples. No new synthetic audio is generated;
+place your licensed recordings in the sample directories described below. The old key-loop assets
+remain only for the native Expo Audio compatibility path.
 
 | Target | Command |
 | --- | --- |
@@ -35,7 +36,7 @@ or change the synthesis. Everything else runs straight from a clean clone.
 npm run check          # typecheck + lint + the full test suite
 npm run typecheck      # tsc --noEmit
 npm run lint           # eslint
-npm test               # fade math + engine integration + loop integrity
+npm test               # fade math + audio engines + sequencer + legacy loop integrity
 npm run verify:audio   # prove every generated loop is click-free
 ```
 
@@ -123,84 +124,92 @@ progress bar during the fade, and the screen is kept awake while the tab is open
 
 ---
 
-## The sample library
+## Recorded WAV sample bank (Web Audio)
 
-`npm run generate:audio` renders a complete royalty-free placeholder library — 12 keys × 3
-pitched stems, plus 3 ambience beds (vinyl, rain, warm room), 39 files and about 8 MB.
+The browser's **PERFORM** tab is a real WAV multisampler. It does not create oscillator tones,
+render audio with JavaScript, or fall back to generated samples. Each enabled layer loads recordings
+from its own folder, then transposes the nearest recorded root with Web Audio `playbackRate`.
+Missing roots and decode errors appear in the layer rack; absent files are never synthesized.
 
-Seamless looping is the whole game, and the two stem families need different treatment:
+### Add pad multisamples
 
-**Tonal stems** (base / shimmer / sub) — every partial and every LFO frequency is quantised onto
-the loop's harmonic grid, i.e. an integer number of cycles per loop. A waveform built only from
-exact harmonics of the loop period is mathematically periodic at that period, so the last sample
-flows into the first with no discontinuity. Worst-case detune from quantisation is well under a
-cent, so it is inaudible.
+Put royalty-cleared, sustained/loop-ready WAV files here:
 
-There is a subtlety that is easy to get wrong: **a causal IIR filter started from a cold state
-produces a start-up transient, which makes even a perfectly periodic input come out
-non-periodic** — and a non-periodic buffer clicks. Every filter in the generator therefore runs
-a full "warm-up" lap over the buffer purely to settle its state before the real pass. Skipping
-that step made the sub-bass loop point jump *10× a normal sample step*; with it, the worst seam
-in the whole library is 0.84× a normal step.
-
-**Noise textures** cannot be harmonic-quantised, so they are rendered long and then
-wrap-crossfaded: the tail is blended back over the head with an equal-power curve, so the end of
-the loop already *is* the beginning.
-
-`npm run verify:audio` proves it, and fails the build if any loop regresses:
-
-```
-AuraPad loop integrity — 39 files, pass threshold wrap/max <= 1
-file              rate    len    peak   rms     wrapStep   maxStep    wrap/max  result
-A/base            22050   6.00s  0.720  0.1947  5.09e-2    8.87e-2    0.5742    PASS
-...
-worst seam: Fs/sub at ratio 0.8423
-
-All loops seamless.
+```text
+src/assets/audio/pads/
+├── warm-pad/       C2.wav  C4.wav  C6.wav
+├── shimmer-pad/    C2.wav  C4.wav  C6.wav
+└── sub-bass/       C2.wav  C4.wav  C6.wav
 ```
 
-The test measures the jump across the loop point against the loop's own largest internal step.
-If the seam looks like ordinary waveform motion, you cannot hear it.
+The recommended anchors are C2, C4, and C6. Additional note-named roots are supported, for example
+`G3.wav` or `F#5.wav`; the sampler picks the closest available root for the played note. Use the
+same filename convention in each pad directory. The files should be clean sustained recordings
+whose loop points have already been prepared—AuraPad loops them but does not edit, synthesize, or
+repair the audio.
 
-### Swapping in real audio
+### Add ambience beds
 
-Drop your own loops into `src/assets/audio/pads/<Key>/{base,shimmer,sub}.wav` (use `Cs`, `Ds`…
-for sharps) and `src/assets/audio/textures/*.wav`, then run `npm run verify:audio` to confirm
-they loop cleanly. `src/assets/audio/index.ts` is generated, but its shape is stable — Metro only
-understands static `require()` calls, which is why the library is spelled out literally.
+Ambience is unpitched and uses one pre-looped recording per bed:
 
----
+```text
+src/assets/audio/beds/
+├── room-bed/loop.wav
+├── rain-bed/loop.wav
+└── vinyl-bed/loop.wav
+```
+
+### Load the recordings
+
+Metro's WAV asset contexts discover files in these folders. After adding recordings, restart Expo if
+the new files are not picked up, then run `npm run web`; a production browser bundle must be
+exported again to include the samples. The app contains folder README files but **no pad or ambience
+recordings have been supplied yet**, so the sample rack initially reports missing WAVs and playback
+stays silent until real files are added.
+
+Downloaded soundfont packs are not loaded directly. Extract or record the desired note samples as
+WAV files, make sure you have the right to use them, and place them with the names above. Keep
+license and attribution information beside the files when required.
+
+### Legacy native audio
+
+The original key-specific loops under `src/assets/audio/pads/<key>/` and ambience files under
+`src/assets/audio/textures/` remain for the existing iOS/Android Expo Audio mixer. They are legacy
+assets and are **not used by the browser multisampler**. The former `scripts/generate-audio.mjs`
+renderer has been removed; no script in the app creates replacement audio. The optional
+`npm run verify:audio` check only validates those pre-existing native compatibility loops.
 
 ## Project layout
 
 ```
 src/
-├── assets/audio/        # generated loops + the static require() registry
+├── assets/audio/
+│   ├── pads/<pad-id>/   # recorded multisamples for the browser sampler
+│   ├── beds/<bed-id>/   # recorded ambience loops
+│   └── pads/<key>/      # legacy native loop assets
+├── audio/
+│   ├── SampleSamplerEngine.ts  # Web Audio WAV sampler and layer crossfades
+│   └── SequencerEngine.ts      # audio-clock progression scheduler
 ├── components/
-│   ├── AudioControls/   # Fader, StemChannelStrip, MixerPanel, TransportBar
+│   ├── AudioControls/   # native mixer controls
 │   ├── KeyGrid/         # 12-key selector, crossfade status bar
 │   ├── PerformCanvas/   # XYControlCanvas
 │   ├── Setlist/         # SetlistBuilder, SongEditor, StageMode
 │   └── ui/              # shared primitives
-├── hooks/
-│   ├── useAudioEngine.ts
-│   └── useSetlists.ts
-├── screens/             # one per tab
-├── services/
-│   ├── AudioService.ts  # native players, decks, crossfade scheduler
-│   └── fades.ts         # pure gain math (no RN imports — directly testable)
-├── types/audio.ts
-├── theme.ts
+├── config/padPresets.ts # pad, bed, and layer catalog
+├── hooks/               # audio and setlist bindings
+├── screens/             # tab screens, including the browser sampler
+├── services/            # native AudioService and shared fade helpers
 └── App.tsx              # shell + tab switcher
-scripts/                 # audio generator, loop verifier, test suites
+scripts/                 # verification and test suites; no audio generator
 ```
 
 Two deliberate departures from a stock Expo app:
 
-- **No navigation library.** All four tabs read and write one live audio engine, and the pad has
-  to keep playing while you move between them — so screens stay mounted and visibility is
-  toggled. Stage Mode also needs to remove the tab bar entirely, and there is no navigation
-  state to get wrong mid-service.
+- **No navigation library.** Native tabs share the existing live audio engine; on web, Perform
+  owns the browser WAV sampler. Screens stay mounted and visibility is toggled, preserving state
+  while switching tabs. Stage Mode also needs to remove the tab bar entirely.
+
 - **No slider library.** `Fader` is built on Reanimated so it animates on the UI thread, can be a
   tall vertical mixer fader, and — importantly for live use — drags **relatively**. Touching a
   fader never makes the level jump to your finger.
@@ -217,8 +226,10 @@ figures so they do not shuffle sideways as they tick.
 | Suite | What it covers |
 | --- | --- |
 | `scripts/test-fades.mjs` | 18 tests. Curve endpoints, monotonicity, symmetry, dB linearity, equal-power constancy, X/Y mapping, gain graph clamping. |
-| `scripts/test-engine.mjs` | 21 tests. Runs the **real** `AudioService`, stubbing only `expo-audio` and the Metro asset registry via Node's `module.registerHooks`. Covers crossfade overlap, retargeting mid-fade, phase alignment, deck release, drone lock both ways, LRU eviction, pinning, preload, mute/master/canvas gain, and the zero-re-render guarantee. |
-| `scripts/verify-audio.mjs` | 39 files. Loop-seam integrity, DC offset, peak ceiling. |
+| `scripts/test-engine.mjs` | Runs the **real** native `AudioService`, stubbing only `expo-audio` and the Metro asset registry. Covers crossfades, drone lock, cache eviction, mixer gain, and preload behavior. |
+| `scripts/test-sequencer.mjs` | Audio-clock progression scheduling, pause/resume, looping, tempo changes, time signatures, and invalid step handling. |
+| `scripts/test-sampler.mjs` | WAV anchor lookup, pitch transposition, simultaneous layers, missing-file errors, crossfades, and disposal. |
+| `scripts/verify-audio.mjs` | Checks the 39 pre-existing native compatibility loops; it does not generate audio or validate newly added multisamples. |
 
 No jest, no transform step: `fades.ts` has no React Native imports, and Node strips the
 TypeScript directly.

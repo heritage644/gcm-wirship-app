@@ -4,8 +4,11 @@ const { getDefaultConfig } = require('expo/metro-config');
 /** @type {import('expo/metro-config').MetroConfig} */
 const config = getDefaultConfig(__dirname);
 
-// The generated pad loops are .wav; Metro bundles that extension by default,
-// but assert it so a future upstream change cannot silently break the library.
+// Require contexts let the browser sampler discover note-named WAVs added later.
+config.transformer.unstable_allowRequireContext = true;
+
+// Recorded multisamples and the legacy native loops are WAV assets. Metro
+// currently bundles .wav by default; keep the assertion for future upgrades.
 if (!config.resolver.assetExts.includes('wav')) {
   config.resolver.assetExts.push('wav');
 }

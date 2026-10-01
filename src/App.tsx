@@ -7,7 +7,7 @@
  *  - Native tabs read and write ONE live audio engine. Nothing is ever
  *    "unmounted and reloaded" — the pad must keep playing while you move
  *    between the mixer, the canvas and the setlist. The browser Perform tab
- *    uses its own lazy Web Audio synth. Keeping screens mounted preserves
+ *    uses its own lazy Web Audio sample engine. Keeping screens mounted preserves
  *    scroll and animation state while switching tabs.
  *  - Stage Mode has to take over the entire display with no chrome at all,
  *    which means the tab bar itself must be able to disappear.
@@ -80,7 +80,7 @@ function AuraPad() {
         </View>
         <Text style={styles.brandMeta}>
           {Platform.OS === 'web' && tab === 'perform'
-            ? 'WEB AUDIO · YAMAHA BANK'
+            ? 'SAMPLE LAYERS · WEB AUDIO'
             : engine.state.currentKey
               ? `${engine.state.currentKey} · ${engine.state.isPlaying ? 'LIVE' : 'PAUSED'}`
               : 'IDLE'}

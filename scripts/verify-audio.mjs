@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /**
- * AuraPad — loop integrity check.
+ * AuraPad — legacy native-loop integrity check.
  *
- * Verifies that every generated loop is actually seamless. The test: when a
- * loop restarts, the jump from the final sample back to the first sample must
+ * Verifies the pre-existing Expo Audio compatibility loops. New recorded
+ * multisamples are not generated here and are managed in their pad folders.
+ * The test: when a legacy loop restarts, the jump from the final sample back to the first sample must
  * look like an ordinary sample-to-sample step. If it is much larger than the
  * loop's own largest internal step, the waveform has a discontinuity there and
  * you will hear a click on every repeat.
@@ -28,6 +29,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const AUDIO_DIR = resolve(__dirname, '..', 'src', 'assets', 'audio');
 
 const RATIO_LIMIT = 1.0;
+const LEGACY_KEYS = new Set(['A', 'As', 'B', 'C', 'Cs', 'D', 'Ds', 'E', 'F', 'Fs', 'G', 'Gs']);
 
 function readWav(path) {
   const buf = readFileSync(path);
@@ -85,6 +87,7 @@ function collectFiles() {
   const padsDir = join(AUDIO_DIR, 'pads');
   if (existsSync(padsDir)) {
     for (const keyDir of readdirSync(padsDir).sort()) {
+      if (!LEGACY_KEYS.has(keyDir)) continue;
       for (const f of readdirSync(join(padsDir, keyDir)).sort()) {
         if (f.endsWith('.wav')) files.push([`${keyDir}/${f.replace('.wav', '')}`, join(padsDir, keyDir, f)]);
       }
@@ -102,7 +105,7 @@ function collectFiles() {
 function main() {
   const files = collectFiles();
   if (files.length === 0) {
-    console.error('No audio found. Run `npm run generate:audio` first.');
+    console.error('No legacy native-loop WAVs found to verify.');
     process.exit(1);
   }
 

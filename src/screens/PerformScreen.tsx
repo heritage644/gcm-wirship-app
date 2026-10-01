@@ -1,7 +1,7 @@
 /**
- * PerformScreen — the native live dashboard and browser sound-bank entry.
+ * PerformScreen — the native live dashboard and browser sample-layer entry.
  * Native: transport → key grid → crossfade status → 4-channel mixer.
- * Web: Yamaha-inspired Web Audio presets and progression sequencer.
+ * Web: recorded-WAV multisampler, layer rack, and progression sequencer.
  */
 
 import { useCallback } from 'react';
@@ -12,7 +12,7 @@ import { TransportBar } from '../components/AudioControls/TransportBar';
 import { KeyGrid } from '../components/KeyGrid/KeyGrid';
 import { TransitionStatusBar } from '../components/KeyGrid/TransitionStatusBar';
 import { Panel, SectionLabel } from '../components/ui/Primitives';
-import { YamahaScreen } from './YamahaScreen';
+import { SamplerScreen } from './SamplerScreen';
 import type { AudioEngineApi } from '../hooks/useAudioEngine';
 import { tapLight } from '../services/haptics';
 import { colors, spacing, typography } from '../theme';
@@ -35,9 +35,9 @@ export function PerformScreen({ engine }: PerformScreenProps) {
     [engine, state.currentKey],
   );
 
-  // On desktop web, make the new Web Audio bank the primary perform screen.
-  // Native builds retain the existing Expo Audio multi-stem mixer.
-  if (Platform.OS === 'web') return <YamahaScreen />;
+  // The browser uses the recorded-WAV sampler. Native builds retain the
+  // existing Expo Audio multi-stem path, which is not backed by Web Audio.
+  if (Platform.OS === 'web') return <SamplerScreen />;
 
   return (
     <ScrollView

@@ -24,7 +24,7 @@ export interface ScheduledAudioEvent {
   cancel(): void;
 }
 
-/** Minimal adapter implemented by YamahaEngine and easy to fake in tests. */
+/** Minimal audio-target contract implemented by SampleSamplerEngine and easy to fake in tests. */
 export interface SequencerAudioTarget {
   readonly currentTime: number;
   prepare?: () => Promise<void>;
@@ -619,7 +619,7 @@ export class SequencerEngine {
   }
 
   private cancelFutureEvents(now: number): void {
-    // Cancel newest transitions first. YamahaEngine restores the preceding
+    // Cancel newest transitions first. The audio target restores the preceding
     // voice when a pending transition is cancelled, so reverse order preserves
     // the last key that was already sounding.
     for (let index = this.pendingEvents.length - 1; index >= 0; index -= 1) {

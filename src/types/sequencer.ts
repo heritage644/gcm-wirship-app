@@ -25,7 +25,7 @@ export interface SongProgression {
   songTitle: string;
   bpm: number;
   timeSignature: TimeSignature;
-  /** References one of the Yamaha-inspired synthesis profiles. */
+  /** Identifier for the selected sound preset or sample-layer rack. */
   soundPresetId: string;
   steps: ProgressionStep[];
 }

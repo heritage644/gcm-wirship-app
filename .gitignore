@@ -40,5 +40,5 @@ yarn-error.*
 /ios
 /android
 
-# AuraPad: the generated sample library IS committed (the app needs it to run).
-# Re-render it with `npm run generate:audio`.
+# AuraPad keeps the pre-existing native compatibility loops in source control.
+# New recorded WAV multisamples belong in src/assets/audio/pads/<pad-id>/.
