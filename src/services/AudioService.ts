@@ -388,9 +388,22 @@ export class AudioService {
     if (!key) return;
     this.pinnedKeys.clear();
     if (key === this.currentKey) return;
+
+    // Preloading an already-warm key is a no-op from React's point of view.
+    // In particular, don't notify useSyncExternalStore just because a screen
+    // re-ran an effect with the same key.
+    const hadAllPlayers = PITCHED_STEMS.every((stem) =>
+      this.playerCache.has(this.cacheKeyFor(stem, key)),
+    );
+    const previousRecency = [...this.keyRecency];
+
     this.pinnedKeys.add(key);
     for (const stem of PITCHED_STEMS) this.acquirePitchedPlayer(stem, key);
-    this.invalidate();
+
+    const recencyChanged =
+      previousRecency.length !== this.keyRecency.length ||
+      previousRecency.some((cachedKey, index) => cachedKey !== this.keyRecency[index]);
+    if (!hadAllPlayers || recencyChanged) this.invalidate();
   }
 
   // =========================================================================
