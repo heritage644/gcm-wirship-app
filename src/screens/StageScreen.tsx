@@ -12,6 +12,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { StageMode } from '../components/Setlist/StageMode';
 import type { AudioEngineApi } from '../hooks/useAudioEngine';
 import type { SetlistsApi } from '../hooks/useSetlists';
+import { tapCommit, tapRejected } from '../services/haptics';
 import { colors, spacing, typography } from '../theme';
 
 export interface StageScreenProps {
@@ -32,12 +33,20 @@ export function StageScreen({ engine, setlists, onExit }: StageScreenProps) {
 
   const handleNext = useCallback(() => {
     const song = setlists.advance();
-    if (song) engine.applySong(song);
+    if (song) {
+      tapCommit();
+      engine.applySong(song);
+    } else {
+      tapRejected(); // end of set — tell the hand, not the eye
+    }
   }, [engine, setlists]);
 
   const handlePrevious = useCallback(() => {
     const song = setlists.rewind();
-    if (song) engine.applySong(song);
+    if (song) {
+      tapCommit();
+      engine.applySong(song);
+    }
   }, [engine, setlists]);
 
   if (songs.length === 0) {

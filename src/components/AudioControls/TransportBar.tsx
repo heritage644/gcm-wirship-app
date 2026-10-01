@@ -8,6 +8,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { MONO, TOUCH, colors, radius, spacing, typography } from '../../theme';
+import { tapCommit, tapLight } from '../../services/haptics';
 import { FADE_DURATION_OPTIONS, type EngineSnapshot } from '../../types/audio';
 import { Chip, hexWithAlpha } from '../ui/Primitives';
 
@@ -25,6 +26,15 @@ export function TransportBar({
   onFadeDuration,
 }: TransportBarProps) {
   const { isPlaying, currentKey, droneLock, droneLockedKey, fadeDurationSeconds } = state;
+
+  const handleTogglePlay = () => {
+    tapLight();
+    onTogglePlay();
+  };
+  const handleToggleDroneLock = () => {
+    tapCommit();
+    onToggleDroneLock();
+  };
   const canPlay = currentKey !== null;
   const holdingOldKey = droneLock && droneLockedKey !== null && droneLockedKey !== currentKey;
 
@@ -32,7 +42,7 @@ export function TransportBar({
     <View style={styles.container}>
       <View style={styles.topRow}>
         <Pressable
-          onPress={onTogglePlay}
+          onPress={handleTogglePlay}
           disabled={!canPlay}
           accessibilityRole="button"
           accessibilityLabel={isPlaying ? 'Pause pad' : 'Play pad'}
@@ -50,7 +60,7 @@ export function TransportBar({
         </Pressable>
 
         <Pressable
-          onPress={onToggleDroneLock}
+          onPress={handleToggleDroneLock}
           accessibilityRole="switch"
           accessibilityState={{ checked: droneLock }}
           accessibilityLabel="Drone lock: hold the sub-bass on its current key through key changes"

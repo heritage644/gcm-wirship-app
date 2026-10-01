@@ -12,6 +12,7 @@ import { KeyGrid } from '../components/KeyGrid/KeyGrid';
 import { TransitionStatusBar } from '../components/KeyGrid/TransitionStatusBar';
 import { Panel, SectionLabel } from '../components/ui/Primitives';
 import type { AudioEngineApi } from '../hooks/useAudioEngine';
+import { tapLight } from '../services/haptics';
 import { colors, spacing, typography } from '../theme';
 import type { MusicalKey } from '../types/audio';
 
@@ -24,6 +25,7 @@ export function PerformScreen({ engine }: PerformScreenProps) {
 
   const handleSelectKey = useCallback(
     (key: MusicalKey) => {
+      tapLight();
       // First key press doubles as "start the engine".
       if (state.currentKey === null) engine.start(key);
       else engine.selectKey(key);
