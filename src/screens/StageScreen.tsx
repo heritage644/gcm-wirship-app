@@ -29,9 +29,10 @@ export function StageScreen({ engine, setlists, onExit }: StageScreenProps) {
   // this screen, so NEXT SONG never waits on a decoder. `engine` also contains
   // the changing snapshot, so depend on its stable callback rather than the
   // whole object (preloading itself notifies the engine subscribers).
+  const preloadKey = engine.preloadKey;
   useEffect(() => {
-    engine.preloadKey(nextSong?.targetKey);
-  }, [engine.preloadKey, nextSong?.targetKey]);
+    preloadKey(nextSong?.targetKey);
+  }, [preloadKey, nextSong?.targetKey]);
 
   const handleNext = useCallback(() => {
     const song = setlists.advance();

@@ -4,10 +4,11 @@
  * Navigation is a hand-rolled tab switcher rather than a navigation library,
  * for reasons that are specific to this app:
  *
- *  - All four tabs read and write ONE live audio engine. Nothing is ever
+ *  - Native tabs read and write ONE live audio engine. Nothing is ever
  *    "unmounted and reloaded" — the pad must keep playing while you move
- *    between the mixer, the canvas and the setlist. Keeping the screens
- *    mounted and just toggling visibility guarantees that.
+ *    between the mixer, the canvas and the setlist. The browser Perform tab
+ *    uses its own lazy Web Audio synth. Keeping screens mounted preserves
+ *    scroll and animation state while switching tabs.
  *  - Stage Mode has to take over the entire display with no chrome at all,
  *    which means the tab bar itself must be able to disappear.
  *  - Zero navigation state to get wrong mid-service, and no extra frames of
@@ -46,10 +47,8 @@ export default function App() {
     <SafeAreaProvider>
       <GestureHandlerRootView style={styles.root}>
         <StatusBar barStyle="light-content" backgroundColor={colors.background} />
-        {/* On web the viewport is a desktop window, so the app is constrained
-            to a handset width and centred — stretching a stage UI across
-            1600px would misrepresent how it is actually used. On device this
-            wrapper is a plain flex:1 passthrough. */}
+        {/* Desktop web gets a wider sound-bank workspace; native keeps the
+            original full-width stage layout. */}
         <View style={styles.webShell}>
           <View style={styles.webFrame}>
             <AuraPad />
@@ -80,13 +79,15 @@ function AuraPad() {
           <Text style={styles.brand}>AURAPAD</Text>
         </View>
         <Text style={styles.brandMeta}>
-          {engine.state.currentKey
-            ? `${engine.state.currentKey} · ${engine.state.isPlaying ? 'LIVE' : 'PAUSED'}`
-            : 'IDLE'}
+          {Platform.OS === 'web' && tab === 'perform'
+            ? 'WEB AUDIO · YAMAHA BANK'
+            : engine.state.currentKey
+              ? `${engine.state.currentKey} · ${engine.state.isPlaying ? 'LIVE' : 'PAUSED'}`
+              : 'IDLE'}
         </Text>
       </View>
     ),
-    [insets.top, engine.state.currentKey, engine.state.isPlaying],
+    [insets.top, tab, engine.state.currentKey, engine.state.isPlaying],
   );
 
   const isStage = tab === 'stage';
@@ -190,7 +191,7 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     ...(Platform.OS === 'web'
-      ? { maxWidth: 520, borderLeftWidth: 1, borderRightWidth: 1, borderColor: colors.border }
+      ? { maxWidth: 1240, borderLeftWidth: 1, borderRightWidth: 1, borderColor: colors.border }
       : null),
   },
   container: {

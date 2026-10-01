@@ -1,16 +1,18 @@
 /**
- * PerformScreen — the main live dashboard.
- * Transport → key grid → crossfade status → 4-channel mixer.
+ * PerformScreen — the native live dashboard and browser sound-bank entry.
+ * Native: transport → key grid → crossfade status → 4-channel mixer.
+ * Web: Yamaha-inspired Web Audio presets and progression sequencer.
  */
 
 import { useCallback } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { MixerPanel } from '../components/AudioControls/MixerPanel';
 import { TransportBar } from '../components/AudioControls/TransportBar';
 import { KeyGrid } from '../components/KeyGrid/KeyGrid';
 import { TransitionStatusBar } from '../components/KeyGrid/TransitionStatusBar';
 import { Panel, SectionLabel } from '../components/ui/Primitives';
+import { YamahaScreen } from './YamahaScreen';
 import type { AudioEngineApi } from '../hooks/useAudioEngine';
 import { tapLight } from '../services/haptics';
 import { colors, spacing, typography } from '../theme';
@@ -32,6 +34,10 @@ export function PerformScreen({ engine }: PerformScreenProps) {
     },
     [engine, state.currentKey],
   );
+
+  // On desktop web, make the new Web Audio bank the primary perform screen.
+  // Native builds retain the existing Expo Audio multi-stem mixer.
+  if (Platform.OS === 'web') return <YamahaScreen />;
 
   return (
     <ScrollView
