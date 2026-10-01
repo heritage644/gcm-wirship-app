@@ -403,6 +403,21 @@ await test('preloadKey warms a key without making it audible', async (s) => {
   assert.equal(s.getSnapshot().currentKey, 'C', 'preload must not change the key');
 });
 
+await test('preloading the same warm key does not notify subscribers again', async (s) => {
+  await s.start('C');
+  let notifications = 0;
+  const unsubscribe = s.subscribe(() => {
+    notifications += 1;
+  });
+
+  s.preloadKey('F#');
+  assert.equal(notifications, 1, 'warming a new key should publish the cache update');
+  s.preloadKey('F#');
+  assert.equal(notifications, 1, 'repeating the same preload should be a no-op');
+
+  unsubscribe();
+});
+
 await test('the drone-locked key is pinned against eviction', async (s) => {
   s.setMaxResidentKeys(2);
   await s.start('C');
